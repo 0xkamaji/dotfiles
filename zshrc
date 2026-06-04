@@ -3,20 +3,15 @@ if command -v tmux>/dev/null; then
  [[ ! $TERM =~ screen ]] && [ -z $TMUX ] && tmux
 fi
 
-# OLD PATH
-#/home/poncho/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/opt/:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin
-
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH="/home/poncho/.oh-my-zsh"
-#export ZSH="/home/poncho/.zshrc"
+export ZSH="$HOME/.oh-my-zsh"
 export BROWSER="/usr/bin/firefox"
 
 alias vim=nvim
 alias obi=Obsidian-1.3.7.AppImage
-alias poncho="cd /mnt/c/Users/Poncho"
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
