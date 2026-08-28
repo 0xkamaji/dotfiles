@@ -94,6 +94,11 @@ detect_shell() {
     local shell_path
     local passwd_entry
 
+    shell_path="${SHELL:-}"
+    case "${shell_path##*/}" in
+        bash|zsh|fish) printf '%s\n' "${shell_path##*/}"; return ;;
+    esac
+
     if command -v getent >/dev/null 2>&1; then
         passwd_entry="$(getent passwd "$(id -un)" 2>/dev/null || true)"
         shell_path="${passwd_entry##*:}"
@@ -102,15 +107,9 @@ detect_shell() {
         esac
     fi
 
-    shell_path="${SHELL:-}"
-    case "${shell_path##*/}" in
-        bash|zsh|fish) printf '%s\n' "${shell_path##*/}" ;;
-        *)
-            warn "unsupported login shell: ${shell_path:-unknown}"
-            warn "supported shells are bash, zsh, and fish"
-            return 1
-            ;;
-    esac
+    warn "unable to detect a supported shell environment"
+    warn "supported shells are bash, zsh, and fish"
+    return 1
 }
 
 install_shell_config() {
@@ -167,7 +166,7 @@ install_shell_config() {
 
 printf '\ndotfiles setup\n\n'
 shell_name="$(detect_shell)"
-info "detected $shell_name as the login shell"
+info "detected $shell_name as the shell environment"
 
 install_packages
 
