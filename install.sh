@@ -73,9 +73,9 @@ ensure_repo "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm" 
 ensure_repo "https://github.com/jimeh/tmux-themepack.git" "$HOME/.tmux-themepack" "tmux-themepack"
 
 # Core, terminal-independent environment.
-link_file "$DOTFILES_DIR/shell/zshrc" "$HOME/.zshrc"
-link_file "$DOTFILES_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
-link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
+link_file "$DOTFILES_DIR/dotfiles/zshrc" "$HOME/.zshrc"
+link_file "$DOTFILES_DIR/dotfiles/tmux.conf" "$HOME/.tmux.conf"
+link_file "$DOTFILES_DIR/dotfiles/nvim" "$HOME/.config/nvim"
 
 printf '\n'
 ok "dotfiles installed"
