@@ -115,12 +115,54 @@ detect_shell() {
 
 install_shell_config() {
     local shell_name="$1"
+    local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    local fragment
+    local hook
+    local legacy_fragment
+    local shell_config
 
     case "$shell_name" in
-        bash) link_file "$DOTFILES_DIR/dotfiles/shell/common.sh" "$HOME/.bashrc" ;;
-        zsh)  link_file "$DOTFILES_DIR/dotfiles/shell/common.sh" "$HOME/.zshrc" ;;
-        fish) link_file "$DOTFILES_DIR/dotfiles/shell/config.fish" "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish" ;;
+        bash)
+            fragment="init.sh"
+            legacy_fragment="$DOTFILES_DIR/dotfiles/shell/common.sh"
+            shell_config="$HOME/.bashrc"
+            ;;
+        zsh)
+            fragment="init.sh"
+            legacy_fragment="$DOTFILES_DIR/dotfiles/shell/common.sh"
+            shell_config="$HOME/.zshrc"
+            ;;
+        fish)
+            fragment="init.fish"
+            legacy_fragment="$DOTFILES_DIR/dotfiles/shell/config.fish"
+            shell_config="$config_home/fish/config.fish"
+            ;;
     esac
+
+    link_file "$DOTFILES_DIR/dotfiles/shell/$fragment" "$config_home/dotfiles/$fragment"
+
+    if [[ -L "$shell_config" ]] && [[ "$(readlink "$shell_config")" == "$legacy_fragment" ]]; then
+        rm -- "$shell_config"
+        info "replacing the legacy dotfiles-managed $shell_config symlink with a source hook"
+    fi
+
+    if [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
+        hook="source \"$config_home/dotfiles/$fragment\""
+    else
+        hook="source ~/.config/dotfiles/$fragment"
+    fi
+
+    mkdir -p "$(dirname "$shell_config")"
+    if [[ -e "$shell_config" || -L "$shell_config" ]]; then
+        if grep -Fqx -- "$hook" "$shell_config"; then
+            ok "$shell_config already sources the dotfiles init"
+            return
+        fi
+        printf '\n%s\n' "$hook" >> "$shell_config"
+    else
+        printf '%s\n' "$hook" > "$shell_config"
+    fi
+    ok "added the dotfiles init to $shell_config"
 }
 
 printf '\ndotfiles setup\n\n'
