@@ -10,7 +10,6 @@ warn() { printf '[!] %s\n' "$1" >&2; }
 install_packages() {
     local missing=()
     command -v git  >/dev/null 2>&1 || missing+=(git)
-    command -v zsh  >/dev/null 2>&1 || missing+=(zsh)
     command -v tmux >/dev/null 2>&1 || missing+=(tmux)
     command -v nvim >/dev/null 2>&1 || missing+=(neovim)
 
@@ -70,9 +69,10 @@ link_file() {
     if [[ -e "$target" || -L "$target" ]]; then
         if diff -qr "$source" "$target" >/dev/null 2>&1; then
             info "$target already matches the repo; replacing it with a symlink"
-            rm -rf "$target"
+            rm -rf -- "$target"
         else
             warn "$target exists and differs from the repo version"
+            diff -ru -- "$target" "$source" || true
             read -r -p "Use the dotfiles version of $target? [y/N] " answer
             if [[ ! "$answer" =~ ^[Yy]$ ]]; then
                 info "leaving $target unchanged"
@@ -81,47 +81,62 @@ link_file() {
 
             local backup
             backup="$(next_backup "$target")"
-            mv "$target" "$backup"
+            mv -- "$target" "$backup"
             ok "backed up $target to $backup"
         fi
     fi
 
-    ln -s "$source" "$target"
+    ln -s -- "$source" "$target"
     ok "$target"
 }
 
-set_default_shell() {
-    local zsh_path
-    zsh_path="$(command -v zsh)"
+detect_shell() {
+    local shell_path="${SHELL:-}"
+    local passwd_entry
 
-    if [[ "${SHELL:-}" == "$zsh_path" ]] || [[ "${SHELL:-}" == "$(readlink -f "$zsh_path")" ]]; then
-        ok "zsh is already the default shell"
-        return
+    case "${shell_path##*/}" in
+        bash|zsh|fish) printf '%s\n' "${shell_path##*/}"; return ;;
+    esac
+
+    if command -v getent >/dev/null 2>&1; then
+        passwd_entry="$(getent passwd "$(id -un)")"
+        shell_path="${passwd_entry##*:}"
     fi
 
-    printf '\nCurrent login shell: %s\n' "${SHELL:-unknown}"
-    read -r -p "Make zsh your default shell? [y/N] " answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
-        chsh -s "$zsh_path"
-        ok "default shell changed to zsh; log out and back in for it to take effect"
-    else
-        info "leaving default shell unchanged"
-    fi
+    case "${shell_path##*/}" in
+        bash|zsh|fish) printf '%s\n' "${shell_path##*/}" ;;
+        *)
+            warn "unsupported login shell: ${shell_path:-unknown}"
+            warn "supported shells are bash, zsh, and fish"
+            return 1
+            ;;
+    esac
+}
+
+install_shell_config() {
+    local shell_name="$1"
+
+    case "$shell_name" in
+        bash) link_file "$DOTFILES_DIR/dotfiles/shell/common.sh" "$HOME/.bashrc" ;;
+        zsh)  link_file "$DOTFILES_DIR/dotfiles/shell/common.sh" "$HOME/.zshrc" ;;
+        fish) link_file "$DOTFILES_DIR/dotfiles/shell/config.fish" "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish" ;;
+    esac
 }
 
 printf '\ndotfiles setup\n\n'
+shell_name="$(detect_shell)"
+info "detected $shell_name as the login shell"
+
 install_packages
 
-ensure_repo "https://github.com/ohmyzsh/ohmyzsh.git" "$HOME/.oh-my-zsh" "Oh My Zsh"
 ensure_repo "https://github.com/tmux-plugins/tpm.git" "$HOME/.tmux/plugins/tpm" "TPM"
 ensure_repo "https://github.com/jimeh/tmux-themepack.git" "$HOME/.tmux-themepack" "tmux-themepack"
 
 # Core, terminal-independent environment.
-link_file "$DOTFILES_DIR/dotfiles/zshrc" "$HOME/.zshrc"
 link_file "$DOTFILES_DIR/dotfiles/tmux.conf" "$HOME/.tmux.conf"
 link_file "$DOTFILES_DIR/dotfiles/nvim" "$HOME/.config/nvim"
 
-set_default_shell
+install_shell_config "$shell_name"
 
 printf '\n'
 ok "dotfiles installed"
