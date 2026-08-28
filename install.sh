@@ -39,30 +39,74 @@ ensure_repo() {
     fi
     if [[ -e "$destination" ]]; then
         warn "$destination already exists; not replacing it"
-        return 1
+        return
     fi
     info "installing $name"
     git clone --depth 1 "$url" "$destination"
+}
+
+next_backup() {
+    local target="$1"
+    local backup="${target}_backup"
+    local number=1
+
+    while [[ -e "$backup" || -L "$backup" ]]; do
+        backup="${target}_backup_${number}"
+        ((number++))
+    done
+
+    printf '%s\n' "$backup"
 }
 
 link_file() {
     local source="$1" target="$2"
     mkdir -p "$(dirname "$target")"
 
-    if [[ -L "$target" ]]; then
-        if [[ "$(readlink -f "$target")" == "$(readlink -f "$source")" ]]; then
-            ok "$target"
-            return
+    if [[ -L "$target" ]] && [[ "$(readlink -f "$target")" == "$(readlink -f "$source")" ]]; then
+        ok "$target"
+        return
+    fi
+
+    if [[ -e "$target" || -L "$target" ]]; then
+        if diff -qr "$source" "$target" >/dev/null 2>&1; then
+            info "$target already matches the repo; replacing it with a symlink"
+            rm -rf "$target"
+        else
+            warn "$target exists and differs from the repo version"
+            read -r -p "Use the dotfiles version of $target? [y/N] " answer
+            if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+                info "leaving $target unchanged"
+                return
+            fi
+
+            local backup
+            backup="$(next_backup "$target")"
+            mv "$target" "$backup"
+            ok "backed up $target to $backup"
         fi
-        warn "$target is already a symlink to something else; not replacing it"
-        return 1
     fi
-    if [[ -e "$target" ]]; then
-        warn "$target already exists and is not managed by this repo; not replacing it"
-        return 1
-    fi
+
     ln -s "$source" "$target"
     ok "$target"
+}
+
+set_default_shell() {
+    local zsh_path
+    zsh_path="$(command -v zsh)"
+
+    if [[ "${SHELL:-}" == "$zsh_path" ]] || [[ "${SHELL:-}" == "$(readlink -f "$zsh_path")" ]]; then
+        ok "zsh is already the default shell"
+        return
+    fi
+
+    printf '\nCurrent login shell: %s\n' "${SHELL:-unknown}"
+    read -r -p "Make zsh your default shell? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        chsh -s "$zsh_path"
+        ok "default shell changed to zsh; log out and back in for it to take effect"
+    else
+        info "leaving default shell unchanged"
+    fi
 }
 
 printf '\ndotfiles setup\n\n'
@@ -76,6 +120,8 @@ ensure_repo "https://github.com/jimeh/tmux-themepack.git" "$HOME/.tmux-themepack
 link_file "$DOTFILES_DIR/dotfiles/zshrc" "$HOME/.zshrc"
 link_file "$DOTFILES_DIR/dotfiles/tmux.conf" "$HOME/.tmux.conf"
 link_file "$DOTFILES_DIR/dotfiles/nvim" "$HOME/.config/nvim"
+
+set_default_shell
 
 printf '\n'
 ok "dotfiles installed"
